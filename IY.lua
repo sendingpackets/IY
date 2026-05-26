@@ -149,7 +149,7 @@ if makefolder and isfolder and writefile and isfile then
 	end)
 end
 
-currentVersion = "6.4.2"
+currentVersion = "6.4.3"
 
 ScaledHolder = Instance.new("Frame")
 Scale = Instance.new("UIScale")
@@ -4536,6 +4536,9 @@ CMDs[#CMDs + 1] = {NAME = 'vehicleflyspeed  / vflyspeed [num]', DESC = 'Set vehi
 CMDs[#CMDs + 1] = {NAME = 'cframefly / cfly [speed]', DESC = 'Makes you fly, bypassing some anti cheats (works on mobile)'}
 CMDs[#CMDs + 1] = {NAME = 'uncframefly / uncfly', DESC = 'Disables cfly'}
 CMDs[#CMDs + 1] = {NAME = 'cframeflyspeed  / cflyspeed [num]', DESC = 'Sets cfly speed'}
+CMDs[#CMDs + 1] = {NAME = 'confly [speed]', DESC = 'Makes you fly using constraints, bypassing some anticheats'}
+CMDs[#CMDs + 1] = {NAME = 'unconfly', DESC = 'Disables confly'}
+CMDs[#CMDs + 1] = {NAME = 'conflyspeed [num]', DESC = 'Sets confly speed'}
 CMDs[#CMDs + 1] = {NAME = 'qefly [true / false]', DESC = 'Enables or disables the Q and E hotkeys for fly'}
 CMDs[#CMDs + 1] = {NAME = 'vehiclenoclip / vnoclip', DESC = 'Turns off vehicle collision'}
 CMDs[#CMDs + 1] = {NAME = 'vehicleclip / vclip / unvnoclip', DESC = 'Enables vehicle collision'}
@@ -4765,6 +4768,11 @@ CMDs[#CMDs + 1] = {NAME = 'speed / ws / walkspeed [num]', DESC = 'Change your wa
 CMDs[#CMDs + 1] = {NAME = 'spoofspeed / spoofws [num]', DESC = 'Spoofs your WalkSpeed on the Client'}
 CMDs[#CMDs + 1] = {NAME = 'loopspeed / loopws [num]', DESC = 'Loops your walkspeed'}
 CMDs[#CMDs + 1] = {NAME = 'unloopspeed / unloopws', DESC = 'Turns off loopspeed'}
+CMDs[#CMDs + 1] = {NAME = 'velspeed / vs [num]', DESC = 'Changes your speed using velocity'}
+CMDs[#CMDs + 1] = {NAME = 'unvelspeed / unvs', DESC = 'Disables velspeed'}
+CMDs[#CMDs + 1] = {NAME = 'loopvelspeed / loopvs [num]', DESC = 'Loops velspeed'}
+CMDs[#CMDs + 1] = {NAME = 'unloopvelspeed / unloopvs', DESC = 'Turns off loopvelspeed'}
+CMDs[#CMDs + 1] = {NAME = 'spoofvelspeed / spoofvs [num]', DESC = 'Spoofs your WalkSpeed on the Client while using velspeed'}
 CMDs[#CMDs + 1] = {NAME = 'hipheight / hheight [num]', DESC = 'Adjusts hip height'}
 CMDs[#CMDs + 1] = {NAME = 'jumppower / jpower / jp [num]', DESC = 'Change a players jump height (default is 50)'}
 CMDs[#CMDs + 1] = {NAME = 'spoofjumppower / spoofjp [num]', DESC = 'Spoofs your JumpPower on the Client'}
@@ -7291,6 +7299,124 @@ addcmd('togglefly',{},function(args, speaker)
 	else
 		if not IsOnMobile then sFLY() else mobilefly(speaker) end
 	end
+end)
+
+CONFLYING = false
+conflyspeed = 50
+local conflyConnections = {}
+local conflyObjects = {}
+
+local function disconnectConFly()
+	for _, connection in pairs(conflyConnections) do
+		pcall(function() connection:Disconnect() end)
+	end
+	conflyConnections = {}
+end
+
+local function clearConFlyObjects()
+	for _, object in pairs(conflyObjects) do
+		pcall(function() object:Destroy() end)
+	end
+	conflyObjects = {}
+end
+
+local function stopConFly(speaker)
+	CONFLYING = false
+	disconnectConFly()
+	clearConFlyObjects()
+	pcall(function()
+		local humanoid = speaker.Character and speaker.Character:FindFirstChildOfClass("Humanoid")
+		if humanoid then
+			humanoid.PlatformStand = false
+			humanoid.AutoRotate = true
+		end
+	end)
+end
+
+local function startConFly(speaker)
+	stopConFly(speaker)
+	CONFLYING = true
+
+	local character = speaker.Character or speaker.CharacterAdded:Wait()
+	local root = getRoot(character)
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	if not root or not humanoid then
+		CONFLYING = false
+		return
+	end
+
+	humanoid.PlatformStand = true
+	humanoid.AutoRotate = false
+
+	local attachment = Instance.new("Attachment")
+	attachment.Name = randomString()
+	attachment.Parent = root
+
+	local velocity = Instance.new("LinearVelocity")
+	velocity.Name = randomString()
+	velocity.Attachment0 = attachment
+	velocity.MaxForce = math.huge
+	velocity.RelativeTo = Enum.ActuatorRelativeTo.World
+	velocity.VectorVelocity = Vector3.new()
+	velocity.Parent = root
+
+	local orientation = Instance.new("AlignOrientation")
+	orientation.Name = randomString()
+	orientation.Attachment0 = attachment
+	orientation.Mode = Enum.OrientationAlignmentMode.OneAttachment
+	orientation.MaxTorque = math.huge
+	orientation.Responsiveness = 200
+	orientation.Parent = root
+
+	conflyObjects = {attachment, velocity, orientation}
+
+	table.insert(conflyConnections, speaker.CharacterAdded:Connect(function()
+		stopConFly(speaker)
+	end))
+
+	table.insert(conflyConnections, RunService.RenderStepped:Connect(function()
+		if not CONFLYING or not root.Parent then
+			stopConFly(speaker)
+			return
+		end
+
+		local camera = workspace.CurrentCamera
+		local move = humanoid.MoveDirection
+		local vertical = 0
+		if UserInputService:IsKeyDown(Enum.KeyCode.E) then
+			vertical = vertical + 1
+		end
+		if UserInputService:IsKeyDown(Enum.KeyCode.Q) then
+			vertical = vertical - 1
+		end
+
+		local horizontal = Vector3.new(move.X, 0, move.Z)
+		if horizontal.Magnitude > 1 then
+			horizontal = horizontal.Unit
+		end
+
+		velocity.VectorVelocity = (horizontal + Vector3.new(0, vertical, 0)) * conflyspeed
+		orientation.CFrame = camera.CFrame
+		humanoid.PlatformStand = true
+	end))
+end
+
+addcmd('confly',{},function(args, speaker)
+	if args[1] and isNumber(args[1]) then
+		conflyspeed = tonumber(args[1])
+	end
+	startConFly(speaker)
+end)
+
+addcmd('conflyspeed',{'conflysp'},function(args, speaker)
+	local speed = args[1] or 50
+	if isNumber(speed) then
+		conflyspeed = tonumber(speed)
+	end
+end)
+
+addcmd('unconfly',{'noconfly'},function(args, speaker)
+	stopConFly(speaker)
 end)
 
 CFspeed = 50
@@ -10328,6 +10454,110 @@ end)
 addcmd('unloopspeed',{'unloopws'},function(args, speaker)
 	HumanModCons.wsLoop = (HumanModCons.wsLoop and HumanModCons.wsLoop:Disconnect() and false) or nil
 	HumanModCons.wsCA = (HumanModCons.wsCA and HumanModCons.wsCA:Disconnect() and false) or nil
+end)
+
+velspeed = 16
+local velSpeedEnabled = false
+local velSpeedLoop = false
+local velSpeedConnection
+local velSpeedCharacterConnection
+local velSpoofSpeed
+local velSpoofChar
+local velSpoofHooked = false
+
+local function stopVelSpeed()
+	velSpeedEnabled = false
+	velSpeedLoop = false
+	if velSpeedConnection then
+		velSpeedConnection:Disconnect()
+		velSpeedConnection = nil
+	end
+	if velSpeedCharacterConnection then
+		velSpeedCharacterConnection:Disconnect()
+		velSpeedCharacterConnection = nil
+	end
+end
+
+local function startVelSpeed(speaker, speed, looped)
+	if isNumber(speed) then
+		velspeed = tonumber(speed)
+	end
+
+	if velSpeedConnection then
+		velSpeedConnection:Disconnect()
+		velSpeedConnection = nil
+	end
+	if velSpeedCharacterConnection then
+		velSpeedCharacterConnection:Disconnect()
+		velSpeedCharacterConnection = nil
+	end
+
+	velSpeedEnabled = true
+	velSpeedLoop = looped == true
+
+	if not velSpeedLoop then
+		velSpeedCharacterConnection = speaker.CharacterAdded:Connect(function()
+			stopVelSpeed()
+		end)
+	end
+
+	velSpeedConnection = RunService.Heartbeat:Connect(function()
+		if not velSpeedEnabled then return end
+
+		local character = speaker.Character
+		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+		local root = character and getRoot(character)
+		if not humanoid or not root then return end
+
+		local moveDirection = humanoid.MoveDirection
+		if moveDirection.Magnitude > 0 then
+			local velocity = root.AssemblyLinearVelocity
+			local horizontal = moveDirection.Unit * velspeed
+			root.AssemblyLinearVelocity = Vector3.new(horizontal.X, velocity.Y, horizontal.Z)
+		end
+	end)
+end
+
+addcmd('velspeed',{'vs'},function(args, speaker)
+	startVelSpeed(speaker, args[1] or 16, false)
+end)
+
+addcmd('unvelspeed',{'unvs','novelspeed','novs'},function(args, speaker)
+	stopVelSpeed()
+end)
+
+addcmd('loopvelspeed',{'loopvs'},function(args, speaker)
+	startVelSpeed(speaker, args[1] or 16, true)
+end)
+
+addcmd('unloopvelspeed',{'unloopvs'},function(args, speaker)
+	stopVelSpeed()
+end)
+
+addcmd('spoofvelspeed',{'spoofvs'},function(args, speaker)
+	if args[1] and isNumber(args[1]) then
+		if hookmetamethod then
+			velSpoofSpeed = tonumber(args[1])
+			velSpoofChar = speaker.Character
+			if not velSpoofHooked then
+				velSpoofHooked = true
+				local index; index = hookmetamethod(game, "__index", function(self, key)
+					if not checkcaller() and typeof(self) == "Instance" and self:IsA("Humanoid") and (key == "WalkSpeed" or key == "walkSpeed") and velSpoofChar and self:IsDescendantOf(velSpoofChar) then
+						return velSpoofSpeed or 16
+					end
+					return index(self, key)
+				end)
+				local newindex; newindex = hookmetamethod(game, "__newindex", function(self, key, value)
+					if not checkcaller() and typeof(self) == "Instance" and self:IsA("Humanoid") and (key == "WalkSpeed" or key == "walkSpeed") and velSpoofChar and self:IsDescendantOf(velSpoofChar) then
+						velSpoofSpeed = tonumber(value)
+					end
+					return newindex(self, key, value)
+				end)
+			end
+		else
+			notify('Incompatible Exploit','Your exploit does not support this command (missing hookmetamethod)')
+		end
+	end
 end)
 
 addcmd('spoofjumppower',{'spoofjp'},function(args, speaker)
