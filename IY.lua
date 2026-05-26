@@ -10534,7 +10534,7 @@ end)
 
 addcmd('audiologger',{'alogger'},function(args, speaker)
 	notify("Loading Edge's Audio Logger",'Please wait a moment.')
-	loadstring(game:HttpGet(('https://raw.githubusercontent.com/infyiff/backup/main/audiologger.lua'),true))()
+	loadstring(game:HttpGet(('https://raw.githubusercontent.com/sendingpackets/IY/refs/heads/main/AL.lua'),true))()
 end)
 
 local loopgoto = nil
