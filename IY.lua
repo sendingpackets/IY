@@ -1,5 +1,5 @@
 if IY_LOADED and not _G.IY_DEBUG then
-	-- error("Infinite Yield is already running!", 0)
+	 print("Infinite Yield is already running.")
 	return
 end
 
@@ -149,7 +149,7 @@ if makefolder and isfolder and writefile and isfile then
 	end)
 end
 
-currentVersion = "6.4.1"
+currentVersion = "6.4.2"
 
 ScaledHolder = Instance.new("Frame")
 Scale = Instance.new("UIScale")
@@ -354,7 +354,7 @@ Title.BorderSizePixel = 0
 Title.Size = UDim2.new(0, 250, 0, 20)
 Title.Font = Enum.Font.SourceSans
 Title.TextSize = 18
-Title.Text = "Infinite Yield FE v" .. currentVersion
+Title.Text = "Infinite Yield+ FE v" .. currentVersion
 
 do
 	local emoji = ({
@@ -767,7 +767,7 @@ Credits.Position = UDim2.new(0, 0, 0.9, 30)
 Credits.Size = UDim2.new(0, 250, 0, 20)
 Credits.Font = Enum.Font.SourceSansLight
 Credits.FontSize = Enum.FontSize.Size14
-Credits.Text = "Edge // Zwolf // Moon // Toon // Peyton // ATP"
+Credits.Text = "Edge // Zwolf // Moon // Toon // Peyton // ATP\n sendingpackets was here"
 Credits.TextColor3 = Color3.new(1, 1, 1)
 Credits.ZIndex = 10
 
@@ -4890,6 +4890,8 @@ CMDs[#CMDs + 1] = {NAME = 'addplugin / plugin [name]', DESC = 'Add a plugin via 
 CMDs[#CMDs + 1] = {NAME = 'removeplugin / deleteplugin [name]', DESC = 'Remove a plugin via command'}
 CMDs[#CMDs + 1] = {NAME = 'reloadplugin [name]', DESC = 'Reloads a plugin'}
 CMDs[#CMDs + 1] = {NAME = 'addallplugins / loadallplugins', DESC = 'Adds all available plugins from the workspace folder'}
+CMDs[#CMDs + 1] = {NAME = '', DESC = ''}
+CMDs[#CMDs + 1] = {NAME = 'credits', DESC = 'Displays Infinite Yield credits'}
 -- wait()
 
 for i = 1, #CMDs do
@@ -6479,11 +6481,27 @@ Close_4.MouseButton1Click:Connect(function()
 	PluginsFrame:TweenPosition(UDim2.new(0, 0, 0, 175), "InOut", "Quart", 0.5, true, nil)
 end)
 
+local IYSource = "https://raw.githubusercontent.com/sendingpackets/IY/refs/heads/main/IY.lua"
+local IYQueueSource = ([[
+pcall(function()
+	local env = getgenv and getgenv() or _G
+	env.IY_LOADED = nil
+	env.IY_DEBUG = nil
+end)
+loadstring(game:HttpGet(%q))()
+]]):format(IYSource)
+
 local TeleportCheck = false
+local function queueInfYield()
+	if KeepInfYield and queueteleport then
+		queueteleport(IYQueueSource)
+	end
+end
+
 Players.LocalPlayer.OnTeleport:Connect(function(State)
-	if KeepInfYield and (not TeleportCheck) and queueteleport then
+	if (not TeleportCheck) then
 		TeleportCheck = true
-		queueteleport("loadstring(game:HttpGet('https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source'))()")
+		queueInfYield()
 	end
 end)
 
@@ -6930,6 +6948,7 @@ addcmd('gametp',{'gameteleport'},function(args, speaker)
 end)
 
 addcmd("rejoin", {"rj"}, function(args, speaker)
+	queueInfYield()
 	if #Players:GetPlayers() <= 1 then
 		Players.LocalPlayer:Kick("\nRejoining...")
 		wait()
@@ -6961,6 +6980,7 @@ addcmd("serverhop", {"shop"}, function(args, speaker)
 	end
 
 	if #servers > 0 then
+		queueInfYield()
 		TeleportService:TeleportToPlaceInstance(PlaceId, servers[math.random(1, #servers)], Players.LocalPlayer)
 	else
 		return notify("Serverhop", "Couldn't find a server.")
@@ -13035,6 +13055,10 @@ addcmd("debug", {}, function(args, speaker)
     notify("debug", tostring(opt), 1)
 end)
 
+addcmd('credits',{},function(args, speaker)
+	notify("Infinite Yield+", "Edge // Zwolf // Moon\nToon // Peyton // ATP\nFork by sendingpackets")
+end)
+
 if IsOnMobile then
 	local QuickCapture = Instance.new("TextButton")
 	local UICorner = Instance.new("UICorner")
@@ -13225,14 +13249,34 @@ CaptureService.CaptureEnded:Connect(function()
 end)
 
 task.spawn(function()
+	local function compareVersions(a, b)
+		local aParts, bParts = {}, {}
+		for part in tostring(a or ""):gmatch("%d+") do
+			aParts[#aParts + 1] = tonumber(part)
+		end
+		for part in tostring(b or ""):gmatch("%d+") do
+			bParts[#bParts + 1] = tonumber(part)
+		end
+
+		for i = 1, math.max(#aParts, #bParts) do
+			local aPart = aParts[i] or 0
+			local bPart = bParts[i] or 0
+			if aPart ~= bPart then
+				return aPart < bPart and -1 or 1
+			end
+		end
+
+		return 0
+	end
+
 	local success, latestVersionInfo = pcall(function() 
-		local versionJson = game:HttpGet("https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/version")
+		local versionJson = game:HttpGet("https://raw.githubusercontent.com/sendingpackets/IY/refs/heads/main/version")
 		return HttpService:JSONDecode(versionJson)
 	end)
 
 	if success then
-		if currentVersion ~= latestVersionInfo.Version then
-			notify("Outdated", "Get the new version at infyiff.github.io")
+		if compareVersions(currentVersion, latestVersionInfo.Version) < 0 then
+			notify("Outdated", "Get the new version at github.com/sendingpackets/IY")
 		end
 
 		if latestVersionInfo.Announcement and latestVersionInfo.Announcement ~= "" then
